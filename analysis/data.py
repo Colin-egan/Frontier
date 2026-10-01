@@ -63,3 +63,23 @@ def get_price_history(
 def get_daily_returns(prices: pd.DataFrame) -> pd.DataFrame:
     """Simple daily percentage returns from a price DataFrame."""
     return prices.pct_change().dropna(how="all")
+
+
+def sp500_tickers() -> list[str]:
+    """Current S&P 500 constituent tickers, scraped from Wikipedia.
+
+    Tickers are normalized for yfinance (e.g. "BRK.B" -> "BRK-B").
+    """
+    tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    symbols = tables[0]["Symbol"].tolist()
+    return [s.replace(".", "-") for s in symbols]
+
+
+def filter_liquid(prices: pd.DataFrame, min_coverage: float = 0.95) -> pd.DataFrame:
+    """Drop columns with too much missing data over the window (illiquid/newly-listed proxy).
+
+    `min_coverage` is the minimum fraction of non-NaN trading days required.
+    """
+    coverage = prices.notna().mean()
+    keep = coverage[coverage >= min_coverage].index
+    return prices[keep]
