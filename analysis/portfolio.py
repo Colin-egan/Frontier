@@ -52,3 +52,8 @@ def portfolio_stats(
         "sharpe_ratio": sharpe,
         "correlation_matrix": corr,
     }
+
+
+def project_value(total_value: float, annualized_return: float, years: float = 5) -> float:
+    """Compound `total_value` forward `years` at `annualized_return` (deterministic point estimate)."""
+    return total_value * (1 + annualized_return) ** years

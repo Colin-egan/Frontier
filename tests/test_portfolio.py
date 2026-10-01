@@ -7,6 +7,7 @@ from analysis.portfolio import (
     annualized_volatility,
     correlation_matrix,
     portfolio_stats,
+    project_value,
     sharpe_ratio,
 )
 
@@ -71,3 +72,18 @@ def test_portfolio_stats_known_portfolio_reasonable_sharpe():
     assert -1.0 < stats["sharpe_ratio"] < 5.0
     assert stats["annualized_volatility"] > 0
     assert stats["correlation_matrix"].shape == (2, 2)
+
+
+def test_project_value_compounds_correctly():
+    result = project_value(total_value=1000.0, annualized_return=0.10, years=5)
+    assert result == pytest.approx(1000.0 * 1.10**5)
+
+
+def test_project_value_zero_return_stays_flat():
+    result = project_value(total_value=1000.0, annualized_return=0.0, years=5)
+    assert result == pytest.approx(1000.0)
+
+
+def test_project_value_default_years_is_five():
+    result = project_value(total_value=1000.0, annualized_return=0.10)
+    assert result == pytest.approx(1000.0 * 1.10**5)
