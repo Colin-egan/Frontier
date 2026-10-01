@@ -28,7 +28,9 @@ def test_annualized_volatility_single_asset_matches_std():
     rng = np.random.RandomState(42)
     daily_returns = rng.normal(loc=0.0005, scale=0.01, size=500)
     returns = pd.DataFrame({"A": daily_returns})
-    expected = daily_returns.std() * np.sqrt(252)
+    # ddof=1 matches pandas' DataFrame.cov() default (sample covariance),
+    # which annualized_volatility uses internally.
+    expected = daily_returns.std(ddof=1) * np.sqrt(252)
     result = annualized_volatility(returns, {"A": 1.0})
     assert result == pytest.approx(expected, rel=1e-6)
 
