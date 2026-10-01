@@ -44,7 +44,9 @@ def get_price_history(
     )
 
     if len(tickers) == 1:
-        prices = raw[["Close"]].rename(columns={"Close": tickers[0]})
+        # yfinance still returns MultiIndex (ticker, field) columns with
+        # group_by="ticker" even for a single ticker, not a flat "Close".
+        prices = raw[[tickers[0]]].xs("Close", axis=1, level=1)
     else:
         prices = pd.DataFrame({t: raw[t]["Close"] for t in tickers if t in raw})
 
