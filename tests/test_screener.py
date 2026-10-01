@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 
-from analysis.screener import rank_candidates
+from analysis.screener import rank_candidates, simulate_trade
 
 
 def _sample_returns(n: int = 500) -> pd.DataFrame:
@@ -53,3 +54,57 @@ def test_rank_candidates_result_columns():
 
     expected_columns = {"ticker", "delta_sharpe", "new_sharpe", "delta_volatility", "new_volatility", "new_return"}
     assert expected_columns.issubset(ranked.columns)
+
+
+def test_simulate_trade_new_money_dilutes_existing_and_adds_candidate():
+    returns = _sample_returns()
+    result = simulate_trade({"PORT": 1.0}, "GOOD", amount=1000.0, total_value=4000.0, funding="new_money", returns=returns)
+
+    assert result["new_weights"] == pytest.approx({"PORT": 0.8, "GOOD": 0.2})
+    assert result["new_total_value"] == pytest.approx(5000.0)
+    assert result["capped"] is False
+    assert set(result["before"]) == {"annualized_return", "annualized_volatility", "sharpe_ratio", "correlation_matrix"}
+
+
+def test_simulate_trade_auto_prorata_matches_shrink_and_add():
+    returns = _sample_returns()
+    result = simulate_trade({"PORT": 1.0}, "GOOD", amount=400.0, total_value=4000.0, funding="auto_prorata", returns=returns)
+
+    assert result["new_weights"] == pytest.approx({"PORT": 0.9, "GOOD": 0.1})
+    assert result["new_total_value"] == pytest.approx(4000.0)
+
+
+def test_simulate_trade_specific_holding_moves_only_source():
+    returns = _sample_returns()
+    result = simulate_trade(
+        {"PORT": 0.6, "BAD": 0.4}, "GOOD", amount=800.0, total_value=4000.0,
+        funding="specific_holding", returns=returns, source_ticker="BAD",
+    )
+
+    assert result["new_weights"] == pytest.approx({"PORT": 0.6, "BAD": 0.2, "GOOD": 0.2})
+    assert result["capped"] is False
+
+
+def test_simulate_trade_specific_holding_caps_when_amount_exceeds_source_value():
+    returns = _sample_returns()
+    result = simulate_trade(
+        {"PORT": 0.6, "BAD": 0.4}, "GOOD", amount=5000.0, total_value=4000.0,
+        funding="specific_holding", returns=returns, source_ticker="BAD",
+    )
+
+    assert result["capped"] is True
+    assert result["capped_amount"] == pytest.approx(1600.0)
+    assert result["new_weights"]["BAD"] == pytest.approx(0.0)
+    assert result["new_weights"]["GOOD"] == pytest.approx(0.4)
+
+
+def test_simulate_trade_unknown_funding_raises():
+    returns = _sample_returns()
+    with pytest.raises(ValueError):
+        simulate_trade({"PORT": 1.0}, "GOOD", 100.0, 1000.0, "bogus_mode", returns)
+
+
+def test_simulate_trade_specific_holding_requires_valid_source_ticker():
+    returns = _sample_returns()
+    with pytest.raises(ValueError):
+        simulate_trade({"PORT": 1.0}, "GOOD", 100.0, 1000.0, "specific_holding", returns, source_ticker="NOT_HELD")

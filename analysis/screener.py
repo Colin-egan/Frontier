@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from analysis.portfolio import annualized_return, annualized_volatility, sharpe_ratio
+from analysis.portfolio import annualized_return, annualized_volatility, portfolio_stats, sharpe_ratio
 
 DEFAULT_EPSILON = 0.05
 
@@ -71,3 +71,71 @@ def rank_candidates(
     if result.empty:
         return result
     return result.sort_values("delta_sharpe", ascending=False).reset_index(drop=True)
+
+
+def simulate_trade(
+    current_weights: dict[str, float],
+    candidate: str,
+    amount: float,
+    total_value: float,
+    funding: str,
+    returns: pd.DataFrame,
+    source_ticker: str | None = None,
+    risk_free_rate: float = 0.02,
+) -> dict:
+    """Simulate funding `candidate` with `amount` dollars.
+
+    `funding` is one of:
+    - "new_money": portfolio grows by `amount`; existing holdings dilute
+      proportionally, candidate gets `amount / new_total`.
+    - "auto_prorata": every holding shrinks proportionally to fund the
+      candidate (the same math `_shrink_and_add` uses for ranking, sized to
+      a real dollar amount instead of a fixed epsilon).
+    - "specific_holding" (requires `source_ticker`): only that holding is
+      trimmed to fund the candidate, capped at its current dollar value.
+
+    Returns before/after portfolio_stats, the resulting weights, the
+    resulting total portfolio value, and whether/how much the requested
+    amount was capped.
+    """
+    if funding == "new_money":
+        new_total_value = total_value + amount
+        new_weights = {t: w * total_value / new_total_value for t, w in current_weights.items()}
+        new_weights[candidate] = new_weights.get(candidate, 0.0) + amount / new_total_value
+        capped, capped_amount = False, amount
+
+    elif funding == "auto_prorata":
+        epsilon = amount / total_value
+        new_weights = _shrink_and_add(current_weights, candidate, epsilon)
+        new_total_value = total_value
+        capped, capped_amount = False, amount
+
+    elif funding == "specific_holding":
+        if source_ticker is None or source_ticker not in current_weights:
+            raise ValueError("source_ticker must be a currently held ticker")
+        source_value = current_weights[source_ticker] * total_value
+        capped_amount = min(amount, source_value)
+        capped = capped_amount < amount
+        delta_weight = capped_amount / total_value
+        new_weights = dict(current_weights)
+        new_weights[source_ticker] -= delta_weight
+        new_weights[candidate] = new_weights.get(candidate, 0.0) + delta_weight
+        new_total_value = total_value
+
+    else:
+        raise ValueError(f"Unknown funding mode: {funding}")
+
+    before_cols = [t for t in current_weights if t in returns.columns]
+    before = portfolio_stats(returns[before_cols], current_weights, risk_free_rate)
+
+    after_cols = [t for t in new_weights if t in returns.columns]
+    after = portfolio_stats(returns[after_cols], new_weights, risk_free_rate)
+
+    return {
+        "before": before,
+        "after": after,
+        "new_weights": new_weights,
+        "new_total_value": new_total_value,
+        "capped": capped,
+        "capped_amount": capped_amount,
+    }
