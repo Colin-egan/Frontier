@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+from io import StringIO
 from pathlib import Path
 
 import pandas as pd
+import requests
 import yfinance as yf
 
 CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
@@ -70,7 +72,10 @@ def sp500_tickers() -> list[str]:
 
     Tickers are normalized for yfinance (e.g. "BRK.B" -> "BRK-B").
     """
-    tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    response.raise_for_status()
+    tables = pd.read_html(StringIO(response.text))
     symbols = tables[0]["Symbol"].tolist()
     return [s.replace(".", "-") for s in symbols]
 

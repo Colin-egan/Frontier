@@ -127,4 +127,4 @@ else:
     display["delta_volatility"] = display["delta_volatility"].map("{:+.2%}".format)
     display["new_volatility"] = display["new_volatility"].map("{:.2%}".format)
     display["new_return"] = display["new_return"].map("{:.2%}".format)
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(display, width="stretch", hide_index=True)
