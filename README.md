@@ -4,7 +4,7 @@ A tool that analyzes a given portfolio's stats and recommends stocks that would 
 
 ## What it does
 
-Given a set of holdings (tickers + weights), it:
+Given a set of dollar-based holdings (ticker, shares, cost basis, purchase date), it:
 
 1. Pulls historical daily prices (via [yfinance](https://github.com/ranaroussi/yfinance)) and computes the portfolio's annualized return, annualized volatility, Sharpe ratio, and pairwise correlation matrix.
 2. Screens a candidate universe (the S&P 500 by default) and ranks each candidate by how much it would improve the portfolio's Sharpe ratio if added.
@@ -36,14 +36,37 @@ The candidate universe defaults to current S&P 500 constituents (scraped from Wi
 - Uses trailing historical returns/covariance as a stand-in for expected future risk/return — a standard simplification, but it means the tool is backward-looking, not predictive.
 - Ignores transaction costs, taxes, and position size constraints.
 - The ε perturbation size affects the ranking at the margin; a larger ε moves further from a true marginal (infinitesimal) analysis.
+- The 5-year projection (see Trade simulation below) is a deterministic point estimate — compounding today's annualized return forward — not a confidence interval or probabilistic forecast.
+
+## Holdings import
+
+Holdings are dollar-based: upload a CSV or edit the table directly in the sidebar. Columns:
+
+| column | required | meaning |
+|---|---|---|
+| `ticker` | yes | stock ticker |
+| `shares` | yes | number of shares held |
+| `cost_basis` | no | total dollars paid for the position (not per-share) — omit to skip gain/loss for that holding |
+| `purchase_date` | no | when the position was opened — omit to skip that holding from the performance-over-time chart |
+
+## Trade simulation
+
+Below the recommendations table, pick a candidate and a dollar amount, then choose how to fund it:
+
+- **Invest new money** — adds the amount on top; existing holdings dilute proportionally.
+- **Move money, auto (pro-rata)** — trims every current holding proportionally to raise the amount (the same math the screener uses to rank candidates, parameterized by a real dollar figure instead of a fixed 5%).
+- **Move money from a specific holding** — trims only that one position, capped at its current value.
+
+The preview shows before/after portfolio stats, a per-holding dollar breakdown, and a 5-year projection: today's annualized return compounded forward as a deterministic point estimate (not a confidence interval — see Limitations).
 
 ## Project layout
 
 ```
 analysis/
   data.py          # yfinance pulls, caching, S&P 500 universe, liquidity filter
-  portfolio.py      # return, volatility, Sharpe ratio, correlation matrix
-  screener.py       # marginal Sharpe contribution ranking
+  portfolio.py      # return, volatility, Sharpe ratio, correlation matrix, 5-year projection
+  screener.py       # marginal Sharpe contribution ranking, trade simulation
+  holdings.py       # dollar-based holdings: parsing, gain/loss, performance-over-time
 app/
   streamlit_app.py  # UI only, imports from analysis/
 tests/
