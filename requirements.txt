@@ -5,3 +5,4 @@ PyPortfolioOpt
 scipy
 streamlit
 matplotlib
+pytest
