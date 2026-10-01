@@ -4,3 +4,4 @@ numpy
 PyPortfolioOpt
 scipy
 streamlit
+matplotlib
