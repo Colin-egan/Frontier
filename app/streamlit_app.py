@@ -1,5 +1,12 @@
 """Thin Streamlit UI over analysis/. No analysis logic lives here."""
 
+import sys
+from pathlib import Path
+
+# Streamlit puts this script's own directory (app/) on sys.path, not the
+# repo root, so the analysis/ package next door isn't importable without this.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
